@@ -1,0 +1,128 @@
+service: api-appointment
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  environment:
+    SNS_TOPIC_ARN: !Ref SNSTopic
+    EVENT_BUS_NAME: !Ref EventBridgeBus
+    APPOINTMENTS_TABLE: AppointmentsTable
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:Query
+      Resource:
+        - !GetAtt AppointmentsTable.Arn
+
+plugins:
+  - serverless-offline
+  - serverless-plugin-typescript
+
+package:
+  exclude:
+    - node_modules/**
+    - src/**/*.spec.ts
+    
+functions:
+  appointment:
+    handler: src/appointment/infrastructure/bootstrap/App.handler
+    events:
+      - http:
+          path: appointment
+          method: post
+      - http:
+          path: appointment/{insuredId}
+          method: get
+      - sqs:
+          arn:
+            Fn::GetAtt: [SQSConfirmation, Arn]
+  
+  appointment_pe:
+    handler: src/appointment_pe/infrastructure/bootstrap/App.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [SQSPE, Arn]
+
+  appointment_cl:
+    handler: src/appointment_cl/infrastructure/bootstrap/App.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [SQSCL, Arn]
+
+resources:
+  Resources:
+    AppointmentsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: AppointmentsTable
+        AttributeDefinitions:
+          - AttributeName: insuredId
+            AttributeType: S
+          - AttributeName: scheduleId
+            AttributeType: N  
+        KeySchema:
+          - AttributeName: insuredId
+            KeyType: HASH
+          - AttributeName: scheduleId
+            KeyType: RANGE  
+        BillingMode: PAY_PER_REQUEST
+    SNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: appointment-topic
+
+    SQSPE:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SQS_PE
+
+    SQSCL:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SQS_CL
+
+    SQSConfirmation:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: SQS_CONFIRMATION
+
+    SNSPESubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref SNSTopic
+        Protocol: sqs
+        Endpoint: !GetAtt SQSPE.Arn
+        FilterPolicy:
+          countryISO: ["PE"]
+
+    SNSCLSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn: !Ref SNSTopic
+        Protocol: sqs
+        Endpoint: !GetAtt SQSCL.Arn
+        FilterPolicy:
+          countryISO: ["CL"]
+
+    EventBridgeBus:
+      Type: AWS::Events::EventBus
+      Properties:
+        Name: appointment-bus
+
+    EventBridgeRule:
+      Type: AWS::Events::Rule
+      Properties:
+        EventBusName: !Ref EventBridgeBus
+        EventPattern:
+          source: ["appointment_pe", "appointment_cl"]
+        Targets:
+          - Arn: !GetAtt SQSConfirmation.Arn
+            Id: "SQSConfirmationTarget"
