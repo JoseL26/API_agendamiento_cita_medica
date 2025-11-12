@@ -10,13 +10,13 @@ AppointmentController {
   }
 
   async register(data: Appointment) : Promise<object> {
-     console.log('Registering appointment with data:', data);
+     console.log('Registrando appointment con data:', data);
     const respuesta= await this.registerAppointment.execute(data);
     return respuesta;
   }
 
   async listByInsuredId(insuredId: string): Promise<object> {
-    console.log('Listing appointments for insuredId:', insuredId);
+    console.log('Listando appointments para insuredId:', insuredId);
     const respuesta= this.registerAppointment.findByInsuredId(insuredId);
     return respuesta;
   }

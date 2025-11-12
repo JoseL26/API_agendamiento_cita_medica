@@ -19,18 +19,26 @@ export const handler = async (
   event: APIGatewayProxyEvent | SQSEvent,
   context: Context,
   callback: Callback) :Promise<APIGatewayProxyResult | void> => {
-   console.log('Event received:', event);
+   console.log('Event recibido:', event);
 
-   if ((event as SQSEvent).Records) {
+   if ((event as SQSEvent).Records) {          
+    console.log('Ver evento recibido en appointment:', JSON.stringify(event));                                                             
     for (const record of (event as SQSEvent).Records) {
+
       const detail = JSON.parse(record.body);
+
+      const message = JSON.parse(detail.detail.Message);
+      const scheduleId = message.scheduleId;
+      const insuredId = message.insuredId;
+
+      const key = {
+        insuredId: { S: insuredId },
+        scheduleId: { N: scheduleId.toString() }
+      };
 
       await dynamo.send(new UpdateItemCommand({
         TableName: process.env.APPOINTMENTS_TABLE,
-        Key: {
-          insuredId: { S: detail.insuredId },
-          scheduleId: { N: detail.scheduleId.toString() }
-        },
+        Key: key,
         UpdateExpression: 'SET #s = :completed',
         ExpressionAttributeNames: { '#s': 'status' },
         ExpressionAttributeValues: { ':completed': { S: 'completed' } }
@@ -38,12 +46,13 @@ export const handler = async (
     }
     return;
   }
+
   if ((event as APIGatewayProxyEvent).httpMethod) {
     const httpEvent = event as APIGatewayProxyEvent;
     if (httpEvent.httpMethod === 'POST' && httpEvent.path === '/appointment') {
       const body = JSON.parse(httpEvent.body || '{}');
       const result = await controller.register(body);
-
+      
       await sns.send(new PublishCommand({
         TopicArn: process.env.SNS_TOPIC_ARN,
         Message: JSON.stringify(body),

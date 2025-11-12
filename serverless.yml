@@ -17,8 +17,12 @@ provider:
         - dynamodb:GetItem
         - dynamodb:UpdateItem
         - dynamodb:Query
-      Resource:
+        - sns:Publish
+        - events:PutEvents
+      Resource:   
         - !GetAtt AppointmentsTable.Arn
+        - !Ref SNSTopic
+        - !GetAtt EventBridgeBus.Arn
 
 plugins:
   - serverless-offline

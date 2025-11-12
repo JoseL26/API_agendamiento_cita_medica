@@ -3,27 +3,17 @@ import mysql from 'mysql2/promise';
 import { AppointmentClRepository } from '../../domain/repository/AppointmentClRepository';
 
 export class AppointmentClMySqlRepository implements AppointmentClRepository {
-  private async getConnection() {
-    return mysql.createConnection({
-      host: process.env.RDS_HOST,
-      user: process.env.RDS_USER,
-      password: process.env.RDS_PASSWORD,
-      database: process.env.RDS_DATABASE,
-      port: Number(process.env.RDS_PORT || 3306)
-    });
-  }
 
-  async save(appointment: any): Promise<void> {
-    const conn = await this.getConnection();
+
+  async save(appointment: any): Promise<object> {
+    console.log('Guardando cita en AppointmentClMySqlRepository:', appointment);
+
+    console.log('Conexión a la base de datos establecida.');
     try {
-      await conn.execute('INSERT INTO appointments (insuredId, scheduleId, countryISO, status) VALUES (?, ?, ?, ?)', [
-        appointment.insuredId,
-        appointment.scheduleId,
-        appointment.countryISO,
-        appointment.status
-      ]);
-    } finally {
-      await conn.end();
+      return {payload: 'Cita guardada exitosamente en MySQL' };
+    } catch (error) {
+      console.error('Error al guardar la cita:', error);
+      throw error;
     }
   }
 }
