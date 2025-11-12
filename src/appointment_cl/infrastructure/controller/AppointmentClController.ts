@@ -8,6 +8,7 @@ export class AppointmentClController {
   }
 
   async register(data: any): Promise<object> {
-    return { ok: true, data };
+    const respuesta = await this.registerAppointment.execute(data);
+    return respuesta;
   }
 }
